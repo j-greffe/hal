@@ -6,6 +6,8 @@
 #include "hal_gpio.h"
 #include "hal_pwm.h"
 
+#if defined(__MSP430G2553)
+
 static bool g_setup = false;
 static bool g_conf = false;
 
@@ -85,3 +87,5 @@ int hal_pwm_A1_stop(void)
 
 	return 0;
 }
+
+#endif

@@ -26,6 +26,7 @@
 //fDCO(15,7)    DCO frequency (15, 7)   RSELx = 15, DCOx = 7, MODx = 0   3 V   16.0                    26.0    MHz
 
 typedef struct {
+    bool xtal_32k;
     uint32_t freq_mclk;
     uint32_t freq_smclk;
     uint32_t freq_aclk;
@@ -33,9 +34,11 @@ typedef struct {
 
 static volatile hal_clk_t g_clock;
 
-void hal_clk_open(void)
+void hal_clk_open(bool xtal_32k)
 {
     uint8_t reg;
+
+    g_clock.xtal_32k = xtal_32k;
 
     // MOD_0. DCO_7.
     reg = DCOCTL;
@@ -55,15 +58,26 @@ void hal_clk_open(void)
     reg |= (SELM_0) | (DIVM_0) | (0) | (DIVS_0);
     BCSCTL2 = reg;
 
-    // 32768-Hz crystal on LFXT1 (XTS=0). Xcap 12.5pF
-    reg = BCSCTL3;
-    reg &= ~((XT2S0 | XT2S1) | (LFXT1S0 | LFXT1S1) | (XCAP0 | XCAP1));
-    reg |= (XT2S_0) | (LFXT1S_0) | (XCAP_2);
-    BCSCTL3 = reg;
+    if (g_clock.xtal_32k)
+    {
+        // 32768-Hz crystal on LFXT1 (XTS=0). Xcap 12.5pF
+        reg = BCSCTL3;
+        reg &= ~((XT2S0 | XT2S1) | (LFXT1S0 | LFXT1S1) | (XCAP0 | XCAP1));
+        reg |= (XT2S_0) | (LFXT1S_0) | (XCAP_2);
+        BCSCTL3 = reg;
 
-    g_clock.freq_mclk   = 16000000;
-    g_clock.freq_smclk  = 16000000;
-    g_clock.freq_aclk   = HAL_CLK_BASE_ACLK/8;
+        // Wait for fault bit to clear
+        while (BCSCTL3 & LFXT1OF);
+
+        g_clock.freq_aclk = HAL_CLK_BASE_ACLK/8;
+    }
+    else
+    {
+        g_clock.freq_aclk = 0;
+    }
+
+    g_clock.freq_mclk   = HAL_CLK_BASE_MCLK;
+    g_clock.freq_smclk  = HAL_CLK_BASE_MCLK;
 }
 
 void hal_clk_set(hal_clk_type_t clock, uint32_t frequency)
@@ -72,13 +86,16 @@ void hal_clk_set(hal_clk_type_t clock, uint32_t frequency)
 
     switch (clock)
     {
-    case HAL_CLK_MCLK:
-        // TODO
-        break;
-    case HAL_CLK_SMCLK:
+    case HAL_CLK_TACLK:
         // TODO
         break;
     case HAL_CLK_ACLK:
+
+        if (!g_clock.xtal_32k)
+        {
+            return;
+        }
+
         // Set ACLK divider
         reg = BCSCTL1;
         reg &= ~(DIVA0 | DIVA1);
@@ -87,6 +104,26 @@ void hal_clk_set(hal_clk_type_t clock, uint32_t frequency)
         else if (HAL_CLK_BASE_ACLK/8 < frequency) { reg |= (DIVA_2); g_clock.freq_aclk = HAL_CLK_BASE_ACLK/4; }
         else                                      { reg |= (DIVA_3); g_clock.freq_aclk = HAL_CLK_BASE_ACLK/8; }
         BCSCTL1 = reg;
+
+        // Wait for fault bit to clear
+        while (BCSCTL3 & LFXT1OF);
+
+        break;
+    case HAL_CLK_MCLK:
+        // TODO
+        break;
+    case HAL_CLK_SMCLK:
+        // Set SMCLK divider
+        reg = BCSCTL2;
+        reg &= ~(DIVS0 | DIVS1);
+        if      (g_clock.freq_smclk/2 < frequency) { reg |= (DIVS_0); g_clock.freq_smclk = HAL_CLK_BASE_MCLK/1; }
+        else if (g_clock.freq_smclk/4 < frequency) { reg |= (DIVS_1); g_clock.freq_smclk = HAL_CLK_BASE_MCLK/2; }
+        else if (g_clock.freq_smclk/8 < frequency) { reg |= (DIVS_2); g_clock.freq_smclk = HAL_CLK_BASE_MCLK/4; }
+        else                                       { reg |= (DIVS_3); g_clock.freq_smclk = HAL_CLK_BASE_MCLK/8; }
+        BCSCTL2 = reg;
+        break;
+    case HAL_CLK_INCLK:
+        // TODO
         break;
     default:
         break;

@@ -5,11 +5,19 @@
 
 #define GPIO_PORT_NB    (sizeof(g_pdir)/sizeof(uint8_t*))
 
+#if defined(__MSP430G2231)
+static volatile uint8_t* g_pdir[] = { &P1DIR, &P2DIR };
+static volatile uint8_t* g_pout[] = { &P1OUT, &P2OUT };
+static volatile uint8_t* g_psel[] = { &P1SEL, &P2SEL };
+static volatile const uint8_t* g_pin[] = { &P1IN, &P2IN };
+static volatile uint8_t* g_pren[] = { &P1REN, &P2REN };
+#elif defined(__MSP430G2553)
 static volatile uint8_t* g_pdir[] = { &P1DIR, &P2DIR, &P3DIR };
 static volatile uint8_t* g_pout[] = { &P1OUT, &P2OUT, &P3OUT };
 static volatile uint8_t* g_psel[] = { &P1SEL, &P2SEL, &P3SEL };
 static volatile const uint8_t* g_pin[] = { &P1IN, &P2IN, &P3IN };
 static volatile uint8_t* g_pren[] = { &P1REN, &P2REN, &P3REN };
+#endif
 
 void hal_gpio_set(gpio_t io)
 {
