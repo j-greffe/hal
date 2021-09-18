@@ -2,27 +2,33 @@
 #include "hal_clk_p.h"
 #include "hal_timer.h"
 
-#if defined(__MSP430_HAS_TA3__)
 static volatile uint16_t* g_tar[HAL_TIMER_QTY] = {
      &TA0R,
-     &TA1R
-};
-static volatile uint16_t* g_tactl[HAL_TIMER_QTY] = {
-     &TA0CTL,
-     &TA1CTL
-};
-static volatile uint16_t* g_tacctl[HAL_TIMER_QTY][HAL_TIMER_INT_QTY] = {
-    { &TA0CCTL0, &TA0CCTL1, &TA0CCTL2 },
-    { &TA1CCTL0, &TA1CCTL1, &TA1CCTL2 }
-};
-static volatile uint16_t* g_taccr[HAL_TIMER_QTY][HAL_TIMER_INT_QTY] = {
-    { &TA0CCR0, &TA0CCR1, &TA0CCR2 },
-    { &TA1CCR0, &TA1CCR1, &TA1CCR2 }
+#if defined(__MSP430_HAS_TA3__)
+     &TA1R,
+#endif
 };
 
-#else
-#error "Please define your timer."
+static volatile uint16_t* g_tactl[HAL_TIMER_QTY] = {
+     &TA0CTL,
+#if defined(__MSP430_HAS_TA3__)
+     &TA1CTL,
 #endif
+};
+
+static volatile uint16_t* g_tacctl[HAL_TIMER_QTY][HAL_TIMER_INT_QTY] = {
+    { &TA0CCTL0, &TA0CCTL1, &TA0CCTL2 },
+#if defined(__MSP430_HAS_TA3__)
+    { &TA1CCTL0, &TA1CCTL1, &TA1CCTL2 },
+#endif
+};
+
+static volatile uint16_t* g_taccr[HAL_TIMER_QTY][HAL_TIMER_INT_QTY] = {
+    { &TA0CCR0, &TA0CCR1, &TA0CCR2 },
+#if defined(__MSP430_HAS_TA3__)
+    { &TA1CCR0, &TA1CCR1, &TA1CCR2 },
+#endif
+};
 
 static hal_timer_t g_timer[HAL_TIMER_QTY][HAL_TIMER_INT_QTY];
 
@@ -33,10 +39,10 @@ void hal_timer_open(hal_timer_hw_t timer, hal_timer_clk_t clock)
         // ACKL / 8
         hal_clk_set(HAL_CLK_ACLK, HAL_CLK_BASE_ACLK/8);
 
-        // 16 bits, ACLK (32768Hz external oscillator / 8), DIV/4, Continuous mode.
-        // --> (2^16)/((32768/8)/4) = 64s before wrap
-        // Timer Tick is 1/1024th second
-        *(g_tactl[timer]) = (TASSEL_1 | ID_2 | MC_2);
+        // 16 bits, ACLK (32768Hz external oscillator / 8), DIV/1, Continuous mode.
+        // --> (2^16)/((32768/8)/1) = 16s before wrap
+        // Timer Tick is quarter of Ti (qTi = 1/4096th second)
+        *(g_tactl[timer]) = (TASSEL_1 | ID_0 | MC_2);
     }
     else if (HAL_TIMER_CLK_SYS == clock)
     {
@@ -64,6 +70,8 @@ void hal_timer_close(hal_timer_hw_t timer)
 
 void hal_timer_start(hal_timer_hw_t timer, hal_timer_int_t idx, uint8_t mode, hal_isr_t action, void* param, uint16_t ti)
 {
+    hal_timer_stop(timer, idx);
+
     // Configure timer
     g_timer[timer][idx].time = ti;
     g_timer[timer][idx].mode = mode;
@@ -79,8 +87,13 @@ void hal_timer_start(hal_timer_hw_t timer, hal_timer_int_t idx, uint8_t mode, ha
 	}
 	else
 	{
-        // Configure interrupt
-        *(g_taccr[timer][idx]) = (uint16_t)(ti+(uint16_t)TAR);
+
+
+
+        // Set actual value
+        *(g_taccr[timer][idx]) = (uint16_t)(ti+(uint16_t)hal_timer_get_time(timer));
+
+        // Enable interrupt
         *(g_tacctl[timer][idx]) = (CCIE);
 	}
 }

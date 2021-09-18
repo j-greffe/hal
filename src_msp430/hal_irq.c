@@ -15,6 +15,23 @@ typedef struct
 
 #define HAL_IRQ_NB  (8*(sizeof(g_pies)/sizeof(uint8_t*)))
 static hal_irq_t g_hal_irq[HAL_IRQ_NB];
+static volatile uint32_t g_critical = 0;
+
+void hal_irq_critical_enter(void)
+{
+    if (!g_critical++)
+    {
+        __disable_interrupt();
+    }
+}
+
+void hal_irq_critical_exit(void)
+{
+    if (!(--g_critical))
+    {
+        __enable_interrupt();
+    }
+}
 
 void hal_irq_set(gpio_t io, uint8_t edge, hal_isr_t action, void* param)
 {

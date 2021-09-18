@@ -6,7 +6,9 @@
 
 typedef enum {
     HAL_TIMER_0,
+#if defined(__MSP430_HAS_TA3__)
     HAL_TIMER_1,
+#endif
     HAL_TIMER_QTY,
 } hal_timer_hw_t;
 

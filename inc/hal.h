@@ -14,9 +14,9 @@ typedef void(*hal_isr_t)(void*);
 #include "hal_wdg.h"
 
 typedef struct {
-    bool xtal_32k;
+    bool xtal_32k; // Board has 32768Hz crystal oscillator
 } hal_hwcfg_t;
 
 void hal_open(const hal_hwcfg_t* hwcfg);
 
-#endif
+#endif // _HAL_H_
